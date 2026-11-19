@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI旅行コンシェルジュ | Cubeグループ</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0;}
+body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", sans-serif; background: #f4f7fb; color: #1c2733; line-height: 1.6;}
+header { background: #0d4d8f; color: #fff; padding: 14px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;}
+header h1 { font-size: 20px; font-weight: 700;}
+header.sub { font-size: 12px; opacity:.85; width: 100%;}
+.spacer { flex: 1;}
+.point-badge { background: #fff; color: #0d4d8f; border-radius: 999px; padding: 4px 12px; font-weight: 700; font-size: 14px;}
+.point-badge small { font-weight: 400; font-size: 11px;}
+#authBtn { background: #fff; color: #0d4d8f; border: none; border-radius: 8px; padding: 7px 14px; font-size: 14px; font-weight: 600; cursor: pointer;}
+#authBtn:disabled { opacity:.6;}
+#pointNote { width: 100%; font-size: 12px; opacity:.9; min-height: 1em;}
+main { max-width: 860px; margin: 0 auto; padding: 16px;}
+.card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(20,40,70,.08); margin-bottom: 16px;}
+.card h2 { font-size: 16px; margin-bottom: 10px; color: #0d4d8f;}
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px;}
+@media (max-width: 560px) {.form-grid { grid-template-columns: 1fr;}}
+label.f { display: block; font-size: 13px; font-weight: 600;}
+label.f input, label.f select { width: 100%; margin-top: 4px; padding: 9px 10px; font-size: 15px; border: 1px solid #c4d2e0; border-radius: 8px; background: #fff; font-weight: 400;}
+.prefs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px;}
+.prefs label { background: #eef4fb; border: 1px solid #c4d2e0; border-radius: 999px; padding: 5px 12px; font-size: 13px; cursor: pointer;}
+.prefs input { margin-right: 5px;}
+#genBtn { width: 100%; margin-top: 14px; background: #0d4d8f; color: #fff; border: none; border-radius: 10px; padding: 13px; font-size: 16px; font-weight: 700; cursor: pointer;}
+#genBtn:disabled { opacity:.55;}
+#status { margin-top: 10px; font-size: 14px; min-height: 1.4em;}
+#status.error { color: #b3261e;}
+.day-card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(20,40,70,.08); margin-bottom: 16px;}
+.day-card h3 { font-size: 17px; color: #0d4d8f; border-bottom: 2px solid #e3edf7; padding-bottom: 6px; margin-bottom: 10px;}
+.row { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px dashed #e6edf4;}
+.row:last-child { border-bottom: none;}
+.row.time { flex: 0 0 64px; font-size: 13px; color: #5a6b7d; font-weight: 600; padding-top: 2px;}
+.row.body { flex: 1; min-width: 0;}
+.row.ttl { font-weight: 700; font-size: 15px;}
+.row.desc { font-size: 13px; color: #41505f; margin-top: 2px;}
+.row img.thumb { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; flex: 0 0 84px;}
+.badge { display: inline-block; font-size: 11px; border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: middle;}
+.badge.ok { background: #e2f4e5; color: #1c6b2a;}
+.badge.warn { background: #fdf0e2; color: #9a5a00;}
+a.ext { color: #0d4d8f; font-weight: 600; text-decoration: none;}
+a.ext:hover { text-decoration: underline;}
+.links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;}
+.links a { background: #eef4fb; border: 1px solid #b9cee6; border-radius: 8px; padding: 7px 12px; font-size: 14px; color: #0d4d8f; font-weight: 600; text-decoration: none;}
+.links a.rakuten { background: #fdeef0; border-color: #efb7bf; color: #a4123f;}
+.links a.jalan { background: #fff3e6; border-color: #f2cf9f; color: #9a5a00;}
+.budget-table { width: 100%; border-collapse: collapse; font-size: 14px;}
+.budget-table td { padding: 6px 4px; border-bottom: 1px solid #e6edf4;}
+.budget-table td:last-child { text-align: right; font-weight: 700; white-space: nowrap;}
+.note { font-size: 12px; color: #5a6b7d;}
+footer { max-width: 860px; margin: 0 auto; padding: 0 16px 28px; font-size: 12px; color: #5a6b7d;}
+#pointToast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px); background: #0d4d8f; color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 14px; font-weight: 700; opacity: 0; pointer-events: none; transition: all.3s; z-index: 50;}
+#pointToast.show { opacity: 1; transform: translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<header>
+<h1>🧳 AI旅行コンシェルジュ</h1>
+<div class="spacer"></div>
+<div class="point-badge"><small>Cubeポイント</small> <span id="pointBalance">0</span> pt</div>
+<button id="authBtn" type="button">ログイン</button>
+<div class="sub">AIが旅行プランを組みます。予約は大手予約サイトへのリンクから（このサイトでは予約・決済はしません）。</div>
+<div id="pointNote"></div>
+</header>
+
+<main>
+<section class="card">
+<h2>旅行の条件</h2>
+<div class="form-grid">
+<label class="f">出発地
+<input id="fromPlace" type="text" value="郡山" autocomplete="off">
+</label>
+<label class="f">行き先（必須）
+<input id="destPlace" type="text" placeholder="例：東京、仙台、日光、会津若松" autocomplete="off">
+</label>
+<label class="f">日数
+<select id="daysSel">
+<option value="1">日帰り</option>
+<option value="2" selected>1泊2日</option>
+<option value="3">2泊3日</option>
+<option value="4">3泊4日</option>
+<option value="5">4泊5日</option>
+</select>
+</label>
+<label class="f">人数
+<select id="peopleSel">
+<option value="1">1名</option>
+<option value="2" selected>2名</option>
+<option value="3">3名</option>
+<option value="4">4名</option>
+<option value="5">5名</option>
+<option value="6">6名</option>
+</select>
+</label>
+<label class="f">予算（合計・任意）
+<input id="budgetInput" type="number" min="0" step="1000" placeholder="例：30000（円）">
+</label>
+<label class="f">出発日（任意）
+<input id="dateInput" type="date">
+</label>
+</div>
+<label class="f" style="margin-top:12px;">好み（任意・複数OK）
+<span class="prefs">
+<label><input type="checkbox" class="pref" value="classic" checked>定番観光</label>
+<label><input type="checkbox" class="pref" value="history">歴史・文化</label>
+<label><input type="checkbox" class="pref" value="nature">自然</label>
+<label><input type="checkbox" class="pref" value="gourmet">グルメ</label>
+<label><input type="checkbox" class="pref" value="shopping">ショッピング</label>
+<label><input type="checkbox" class="pref" value="relax">温泉・のんびり</label>
+</span>
+</label>
+<button id="genBtn" type="button">プランを作る</button>
+<div id="status"></div>
+</section>
+
+<div id="planArea"></div>
+</main>
+
+<footer>
+<p>プランに載せる観光スポットは、Wikipedia（日本語版）の記事で実在を確認できたものだけです。確認できなかった場所は載せず、「未確認」と書くか自由時間にしています。料金の目安は概算で、実際の料金・空き状況はリンク先の予約サイトでご確認ください。予約・決済はリンク先のサイトで行います（旅行業の手配は行いません）。</p>
+<p style="margin-top:6px;">データ出典：Wikipedia（CC BY-SA）／ OpenStreetMap（© OpenStreetMap contributors, ODbL）。プランを作るとCubeポイントが +1pt たまります（1日3ptまで）。</p>
+</footer>
+
+<div id="pointToast"></div>
+
+<script>
+"use strict";
+/* ---------- Cubeポイント（Cube・モール検索と共通のSupabase残高） ----------
+v1 の旅行は、台帳RPCの許可種別の都合で reason="usage_reward" を使う。
+冪等キーの接頭辞 "travel_plan:" で旅行分と分かるようにしてある。
+専用種別 travel_plan への分離は将来のRPC改修時に行う（記録参照）。 */
+var SUPABASE_URL = "https://glvlbgylnxxkyjvcaeym.supabase.co";
+var SUPABASE_PUBLISHABLE_KEY = "sb_publishable_8VCMVdBvYivEFVNA841N8g_EE7c8H3T";
+var POINT_REASON = "usage_reward";
+var POINT_DAILY_CAP = 3;
+var POINT_COOLDOWN_MS = 60000;
+var supabaseClient = null;
+var currentUser = null;
+var currentBalance = 0;
+var lastAwardAt = 0;
+var capReachedToday = false;
+
+function $(id){ return document.getElementById(id);}
+function jstDateStr(d){
+var j = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+var p = function(n){ return (n < 10? "0": "") + n;};
+return j.getUTCFullYear() + "-" + p(j.getUTCMonth() + 1) + "-" + p(j.getUTCDate());
+}
+function jstDayRangeISO(d){
+var j = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+var startUtc = Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - 9 * 60 * 60 * 1000;
+return { start: new Date(startUtc).toISOString(), end: new Date(startUtc + 24 * 60 * 60 * 1000).toISOString()};
+}
+function hashStr(s){
+var h = 0x811c9dc5;
+for (var i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = (h * 0x01000193) >>> 0;}
+return ("0000000" + h.toString(16)).slice(-8);
+}
+function renderPointBadge(){ $("pointBalance").textContent = currentUser? currentBalance: 0;}
+function renderPointNote(){
+var el = $("pointNote");
+if (!el) return;
+if (!currentUser) el.textContent = "ログインするとCubeポイントが貯まります（Cube・モール検索と共通残高）";
+else if (capReachedToday) el.textContent = "今日のポイントは上限まで貯まりました";
+else el.textContent = "";
+}
+function renderAuthUI(){
+var btn = $("authBtn");
+if (btn){ btn.textContent = currentUser? "ログアウト": "ログイン"; btn.disabled = false;}
+renderPointBadge();
+renderPointNote();
+}
+var toastTimer = null;
+function showPointToast(msg){
+var el = $("pointToast");
+el.textContent = msg;
+el.classList.add("show");
+if (toastTimer) clearTimeout(toastTimer);
+toastTimer = setTimeout(function(){ el.classList.remove("show");}, 3200);
+}
+function fetchBalance(){
+if (!supabaseClient ||!currentUser) return Promise.resolve(0);
+return supabaseClient.from("points_balance").select("balance").eq("user_id", currentUser.id).maybeSingle()
+.then(function(res){
+if (res &&!res.error && res.data && typeof res.data.balance === "number") currentBalance = res.data.balance;
+else if (res &&!res.error &&!res.data) currentBalance = 0;
+renderPointBadge();
+return currentBalance;
+}, function(){ renderPointBadge(); return currentBalance;});
+}
+function fetchTodayUsageCount(){
+if (!supabaseClient ||!currentUser) return Promise.resolve(0);
+var range = jstDayRangeISO(new Date());
+return supabaseClient.from("points_ledger").select("id", { count: "exact", head: true})
+.eq("user_id", currentUser.id).eq("reason_code", POINT_REASON)
+.gte("created_at", range.start).lt("created_at", range.end)
+.then(function(res){
+if (res &&!res.error && typeof res.count === "number") return res.count;
+return 0;
+}, function(){ return 0;});
+}
+/* プランが実際に生成できたときだけ +1pt（モール検索と同じ考え方）。
+未ログイン・クールダウン中・上限到達時は静かに何もしない。 */
+function tryAwardPlanPoint(planKey){
+if (!supabaseClient ||!currentUser) return Promise.resolve(false);
+var now = Date.now();
+if (lastAwardAt && now - lastAwardAt < POINT_COOLDOWN_MS) return Promise.resolve(false);
+var key = "travel_plan:" + jstDateStr(new Date(now)) + ":" + hashStr(planKey);
+var prevBalance = currentBalance;
+return supabaseClient.rpc("earn_points", { p_reason: POINT_REASON, p_idempotency_key: key, p_metadata: {}})
+.then(function(res){
+if (res && res.error){
+var msg = (res.error.message || "") + " " + (res.error.details || "") + " " + (res.error.code || "");
+if (msg.indexOf("daily_cap_reached")!== -1){ capReachedToday = true; renderPointNote();}
+return false;
+}
+var newBalance = (res && typeof res.data === "number")? res.data: prevBalance;
+if (newBalance > prevBalance){
+currentBalance = newBalance;
+lastAwardAt = Date.now();
+renderPointBadge();
+return fetchTodayUsageCount().then(function(cnt){
+var n = cnt > 0? cnt: Math.min(POINT_DAILY_CAP, prevBalance + 1);
+showPointToast("+1 pt たまりました（今日 " + n + "/" + POINT_DAILY_CAP + "）");
+return true;
+});
+}
+currentBalance = newBalance;
+renderPointBadge();
+return false;
+}, function(){ return false;});
+}
+function loadSupabaseClient(){
+if (supabaseClient) return Promise.resolve(supabaseClient);
+return import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm").then(function(mod){
+var createClient = mod.createClient || (mod.default && mod.default.createClient);
+supabaseClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+return supabaseClient;
+});
+}
+function initAuth(){
+var btn = $("authBtn");
+if (btn) btn.disabled = true;
+loadSupabaseClient().then(function(client){
+return client.auth.getSession().then(function(res){
+var session = res && res.data? res.data.session: null;
+currentUser = session? session.user: null;
+renderAuthUI();
+if (currentUser) fetchBalance();
+client.auth.onAuthStateChange(function(_event, session2){
+currentUser = session2? session2.user: null;
+if (!currentUser){ currentBalance = 0; capReachedToday = false;}
+renderAuthUI();
+if (currentUser) fetchBalance();
+});
+});
+}).catch(function(){
+currentUser = null;
+renderAuthUI();
+});
+if (btn){
+btn.addEventListener("click", function(){
+if (currentUser){
+if (!supabaseClient) return;
+btn.disabled = true;
+supabaseClient.auth.signOut().then(function(){
+currentUser = null; currentBalance = 0; capReachedToday = false;
+renderAuthUI();
+}, function(){ renderAuthUI();});
+} else {
+loadSupabaseClient().then(function(client){
+return client.auth.signInWithOAuth({ provider: "google", options: { redirectTo: location.origin + location.pathname}});
+}).catch(function(){});
+}
+});
+}
+}
+</script>
+
+<script>
+/*__TRAVEL_LOGIC_BEGIN__*/
+"use strict";
+/* 旅行プラン生成ロジック（UIから分離。Nodeでの検証対象はこのブロック）。
+   方針：スポットは Wikipedia 日本語版の記事で実在確認できたものだけを載せる。
+   確認できないものは載せない（自由時間にする）。料金は概算のみ。 */
+const TravelLogic = (() => {
+  const WIKI_API = "https://ja.wikipedia.org/w/api.php";
+  const NOMINATIM_API = "https://nominatim.openstreetmap.org/search";
+  const FETCH_TIMEOUT_MS = 12000;
+
+  async function fetchJson(url) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, { signal: ctrl.signal, headers: { "Accept": "application/json" } });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return await res.json();
+    } finally { clearTimeout(timer); }
+  }
+  function wikiUrl(params) {
+    const qs = new URLSearchParams(Object.assign({ format: "json", origin: "*" }, params));
+    return WIKI_API + "?" + qs.toString();
+  }
+
+  /* 行き先の座標を得る（中心点。スポットの距離計算と周辺検索に使う）。
+     第1候補 Nominatim、第2候補 Wikipedia の座標つき記事。取れなければ null。 */
+  async function geocode(dest) {
+    try {
+      const url = NOMINATIM_API + "?" + new URLSearchParams({ q: dest, format: "json", limit: "1", "accept-language": "ja" }).toString();
+      const arr = await fetchJson(url);
+      if (Array.isArray(arr) && arr.length && isFinite(+arr[0].lat) && isFinite(+arr[0].lon)) {
+        return { lat: +arr[0].lat, lon: +arr[0].lon, label: String(arr[0].display_name || dest), source: "OpenStreetMap" };
+      }
+    } catch (e) { /* fall through */ }
+    const tries = [dest, dest + "駅", dest + "市", dest + "町"];
+    for (const t of tries) {
+      try {
+        const data = await fetchJson(wikiUrl({ action: "query", prop: "coordinates", titles: t }));
+        const pages = data && data.query && data.query.pages ? Object.values(data.query.pages) : [];
+        for (const p of pages) {
+          if (p && Array.isArray(p.coordinates) && p.coordinates.length) {
+            return { lat: p.coordinates[0].lat, lon: p.coordinates[0].lon, label: t, source: "Wikipedia" };
+          }
+        }
+      } catch (e) { /* try next */ }
+    }
+    return null;
+  }
+
+  /* 候補スポット収集：周辺検索（geosearch）＋全文検索（dest＋観光/好み）。
+     どちらも Wikipedia の記事が実在するものだけが返る。 */
+  async function fetchCandidates(dest, geo, prefs) {
+    const byId = new Map();
+    const add = (pageid, title, lat, lon) => {
+      if (!pageid || !title) return;
+      if (!byId.has(pageid)) byId.set(pageid, { pageid, title, lat: lat ?? null, lon: lon ?? null });
+    };
+    const jobs = [];
+    if (geo) {
+      jobs.push(fetchJson(wikiUrl({ action: "query", list: "geosearch", gscoord: geo.lat + "|" + geo.lon, gsradius: "10000", gslimit: "50" }))
+        .then(d => { ((d.query && d.query.geosearch) || []).forEach(g => add(g.pageid, g.title, g.lat, g.lon)); })
+        .catch(() => {}));
+    }
+    const queries = [dest + " 観光", dest + " 名所"];
+    if ((prefs || []).includes("history")) queries.push(dest + " 史跡");
+    if ((prefs || []).includes("nature")) queries.push(dest + " 自然 公園");
+    if ((prefs || []).includes("relax")) queries.push(dest + " 温泉");
+    for (const q of queries.slice(0, 3)) {
+      jobs.push(fetchJson(wikiUrl({ action: "query", list: "search", srsearch: q, srlimit: "30", srnamespace: "0" }))
+        .then(d => { ((d.query && d.query.search) || []).forEach(s => add(s.pageid, s.title, null, null)); })
+        .catch(() => {}));
+    }
+    await Promise.all(jobs);
+    return Array.from(byId.values());
+  }
+
+  /* 候補の詳細（冒頭文・画像・座標）をまとめて取得する。
+     注意：extracts は exlimit、coordinates は colimit を max にしないと
+     既定件数（20件/10件）を超えた分の記事が空になる（実測で確認）。
+     失敗したバッチは1回だけ間を置いて再試行する。 */
+  async function fetchDetails(cands) {
+    const out = new Map();
+    for (let i = 0; i < cands.length; i += 25) {
+      const batch = cands.slice(i, i + 25);
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const d = await fetchJson(wikiUrl({
+            action: "query", prop: "extracts|pageimages|coordinates",
+            exintro: "1", explaintext: "1", exchars: "320", exlimit: "max",
+            pithumbsize: "400", colimit: "max",
+            pageids: batch.map(c => c.pageid).join("|")
+          }));
+          const pages = d && d.query && d.query.pages ? Object.values(d.query.pages) : [];
+          for (const p of pages) {
+            out.set(p.pageid, {
+              extract: String(p.extract || "").replace(/\s+/g, " ").trim(),
+              thumb: p.thumbnail && p.thumbnail.source ? p.thumbnail.source : null,
+              lat: Array.isArray(p.coordinates) && p.coordinates.length ? p.coordinates[0].lat : null,
+              lon: Array.isArray(p.coordinates) && p.coordinates.length ? p.coordinates[0].lon : null
+            });
+          }
+          break;
+        } catch (e) {
+          if (attempt === 0) await new Promise(r => setTimeout(r, 900));
+        }
+      }
+    }
+    return out;
+  }
+
+  const DENY_TITLE_END = /(事件|事故|本社|支社|営業所|学校|大学|高校|中学校|小学校|幼稚園|保育園|病院|医院|役所|市役所|区役所|町役場|村役場|警察署|消防署|発電所|工場|基地|処理場|斎場|霊園|墓地|刑務所|裁判所|税務署|郵便局|駅|ホテル|旅館|ビジネスホテル|ペンション|民宿|道路|インターチェンジ|ジャンクション|パーキングエリア|サービスエリア)$/;
+  const DENY_TITLE_CONTAINS = ["観光バス", "株式会社", "合同会社", "曖昧さ回避"];
+  /* 場所ではなく「概念」を説明する記事（タイトルが一般名詞そのもの）は載せない */
+  const GENERIC_TITLES = new Set(["遺跡", "史跡", "温泉", "神社", "寺院", "城", "公園", "庭園", "観光", "名所", "博物館", "美術館", "市場", "湖", "滝", "島", "橋", "岬"]);
+  /* 行政区画・鉄道路線・バス会社など「スポットではない」記事の冒頭文パターン */
+  const DENY_EXTRACT = /地方公共団体|(市|区|町|村)である|特別区のひとつ|政令指定都市|鉄道路線|バス事業者|バス会社|有料道路|自動車専用道路|に位置する[市区町村]|[市区町村]制施行|日本の(政治家|実業家|軍人|俳優|女優|歌手|野球選手|サッカー選手|大名|武将|僧侶|神職)/;
+  const SIGHT_WORDS = ["神社", "神宮", "大社", "宮", "寺", "院", "堂", "城", "公園", "庭園", "博物館", "美術館", "水族館", "動物園", "植物園", "タワー", "展望", "温泉", "市場", "商店街", "地下街", "岬", "湖", "池", "沼", "渓谷", "峡", "滝", "砂丘", "鍾乳洞", "記念館", "資料館", "遺跡", "古墳", "テーマパーク", "遊園地", "ドーム", "スカイツリー", "灯台", "高原", "湿原", "海岸", "島", "橋", "山門", "大仏"];
+  const THEME_WORDS = {
+    history: ["城", "寺", "神社", "遺跡", "古墳", "資料館", "記念館", "史跡", "宿場", "武家屋敷", "大仏"],
+    nature: ["公園", "庭園", "湖", "池", "渓谷", "滝", "高原", "湿原", "海岸", "砂丘", "鍾乳洞", "植物園", "沼"],
+    gourmet: ["市場", "商店街", "横丁"],
+    shopping: ["商店街", "地下街", "百貨店", "デパート", "市場"],
+    relax: ["温泉", "庭園", "公園"]
+  };
+  function countHits(text, words) {
+    let n = 0;
+    for (const w of words) if (text.includes(w)) n++;
+    return n;
+  }
+  function haversineKm(aLat, aLon, bLat, bLon) {
+    const R = 6371, rad = Math.PI / 180;
+    const dLat = (bLat - aLat) * rad, dLon = (bLon - aLon) * rad;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(aLat * rad) * Math.cos(bLat * rad) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+
+  /* 実在確認フィルタ＋スコアリング。
+     - 記事の冒頭文が無い／短すぎるものは証拠不足として落とす
+     - 施設の種類として観光向きでないタイトル（駅・ホテル・学校・事件など）は落とす
+     - 観光キーワードがタイトルか冒頭文にあるものだけを残す */
+  function filterAndScore(cands, details, prefs, dest, geo) {
+    const themeWords = [];
+    (prefs || []).forEach(p => { (THEME_WORDS[p] || []).forEach(w => { if (!themeWords.includes(w)) themeWords.push(w); }); });
+    const adminTitles = new Set([dest, dest + "都", dest + "道", dest + "府", dest + "県", dest + "市", dest + "区", dest + "町", dest + "村", dest + "郡"]);
+    const spots = [];
+    for (const c of cands) {
+      const det = details.get(c.pageid);
+      if (!det || !det.extract || det.extract.length < 25) continue;
+      if (adminTitles.has(c.title)) continue;
+      if (GENERIC_TITLES.has(c.title)) continue;
+      if (DENY_TITLE_CONTAINS.some(w => c.title.includes(w))) continue;
+      if (/一覧$/.test(c.title)) continue;
+      if (DENY_TITLE_END.test(c.title)) continue;
+      if (DENY_EXTRACT.test(det.extract)) continue;
+      const titleSight = countHits(c.title, SIGHT_WORDS);
+      const extractSight = countHits(det.extract, SIGHT_WORDS);
+      const titleTheme = countHits(c.title, themeWords);
+      const extractTheme = countHits(det.extract, themeWords);
+      let score = titleSight * 4 + Math.min(extractSight, 3) + titleTheme * 4 + Math.min(extractTheme, 2);
+      if (c.title.includes(dest)) score += 2; /* 行き先名を含むスポットを優先 */
+      if (score < 4) continue;
+      const lat = det.lat ?? c.lat, lon = det.lon ?? c.lon;
+      const distKm = (geo && lat != null && lon != null) ? Math.round(haversineKm(geo.lat, geo.lon, lat, lon) * 10) / 10 : null;
+      /* 座標があるのに中心から遠すぎるものは別の土地の同名・関連記事なので落とす */
+      if (distKm != null && distKm > 50) continue;
+      /* 座標が無いものは、タイトル自体に観光キーワードがある場合だけ採用する */
+      if (lat == null || lon == null) { if (titleSight < 1 && titleTheme < 1) continue; }
+      spots.push({
+        pageid: c.pageid, title: c.title, extract: det.extract, thumb: det.thumb,
+        lat, lon, distKm, score,
+        wikiUrl: "https://ja.wikipedia.org/wiki/" + encodeURIComponent(c.title)
+      });
+    }
+    spots.sort((a, b) => (b.score - a.score) || ((a.distKm ?? 999) - (b.distKm ?? 999)));
+    return spots;
+  }
+
+  function round100(n) { return Math.max(0, Math.round(n / 100) * 100); }
+  /* 予算の割り振り（概算・目安）。金額そのものの正確さは保証しない。 */
+  function budgetSplit(total, people, days) {
+    if (!total || total <= 0 || !people || people <= 0) return null;
+    const nights = days - 1;
+    const perPerson = total / people;
+    if (nights > 0) {
+      return {
+        total, people, days, nights,
+        hotelPerNightPerPerson: round100(perPerson * 0.45 / nights),
+        transportPerPerson: round100(perPerson * 0.25),
+        foodSightPerDayPerPerson: round100(perPerson * 0.30 / days)
+      };
+    }
+    return {
+      total, people, days, nights,
+      hotelPerNightPerPerson: 0,
+      transportPerPerson: round100(perPerson * 0.30),
+      foodSightPerDayPerPerson: round100(perPerson * 0.70 / days)
+    };
+  }
+
+  const enc = encodeURIComponent;
+  const Links = {
+    rakuten: dest => "https://kw.travel.rakuten.co.jp/keyword/Search.do?f_max=30&f_query=" + enc(dest) + "&charset=utf-8",
+    jalan: dest => "https://www.jalan.net/uw/uwp2011/uww2011init.do?screenId=UWW2011&keyword=" + enc(dest),
+    transit: (from, to) => "https://transit.yahoo.co.jp/search/result?from=" + enc(from) + "&to=" + enc(to),
+    mapsSearch: q => "https://www.google.com/maps/search/?api=1&query=" + enc(q)
+  };
+
+  /* 日程の組み立て（ルールベース）。
+     1日 = 午前スポット＋昼食＋午後スポット（＋夜スポットは余裕がある日だけ）。
+     スポットが尽きたら無理に作らず自由時間にする。 */
+  function buildPlan(opts, spots) {
+    const days = opts.days, nights = days - 1;
+    const queue = spots.slice();
+    const take = () => queue.shift() || null;
+    const surplus = Math.max(0, spots.length - days * 2);
+    let eveningLeft = Math.min(Math.max(0, days - 1), surplus);
+    const planDays = [];
+    for (let d = 0; d < days; d++) {
+      const rows = [];
+      const isFirst = d === 0, isLast = d === days - 1;
+      if (isFirst && opts.from) {
+        rows.push({ type: "move", time: "9:00頃", title: opts.from + " → " + opts.dest + " へ移動", note: "時刻は目安です。乗換検索で実際の便を確認してください。", link: { label: "Yahoo!路線情報で調べる", url: Links.transit(opts.from, opts.dest) } });
+      }
+      const am = take();
+      rows.push(am ? { type: "spot", time: "10:30頃", spot: am } : { type: "free", time: "10:30頃", title: "自由時間", note: "確認できたスポットは以上です。無理に埋めず自由時間にしました。" });
+      rows.push({ type: "meal", time: "12:30頃", title: "昼食：" + opts.dest + "の地元グルメ", note: "お店の名前は未確認のため載せていません。地図検索から探してください。", link: { label: "Googleマップで「" + opts.dest + " ランチ」を探す", url: Links.mapsSearch(opts.dest + " ランチ") } });
+      const pm = take();
+      rows.push(pm ? { type: "spot", time: "14:00頃", spot: pm } : { type: "free", time: "14:00頃", title: "自由時間", note: "確認できたスポットは以上です。おみやげ探しなどにどうぞ。" });
+      if (!isLast && eveningLeft > 0) {
+        const ev = take();
+        if (ev) { rows.push({ type: "spot", time: "17:30頃", spot: ev }); eveningLeft--; }
+      }
+      if (d < nights) {
+        rows.push({ type: "stay", time: "19:00頃", title: "宿泊：" + opts.dest + "の中心部エリア", note: "宿の名前・料金は未確認のため載せていません。下のリンク先で日付と人数を指定して探してください。", links: [{ label: "楽天トラベルで探す", url: Links.rakuten(opts.dest), cls: "rakuten" }, { label: "じゃらんで探す", url: Links.jalan(opts.dest), cls: "jalan" }] });
+      }
+      if (isLast && opts.from) {
+        rows.push({ type: "move", time: "16:30頃", title: opts.dest + " → " + opts.from + " へ移動（帰路）", note: "時刻は目安です。乗換検索で実際の便を確認してください。", link: { label: "Yahoo!路線情報で調べる", url: Links.transit(opts.dest, opts.from) } });
+      }
+      planDays.push({ day: d + 1, rows });
+    }
+    return planDays;
+  }
+
+  async function generatePlan(opts) {
+    const prefs = opts.prefs || [];
+    const geo = await geocode(opts.dest);
+    const cands = await fetchCandidates(opts.dest, geo, prefs);
+    const details = await fetchDetails(cands);
+    const spots = filterAndScore(cands, details, prefs, opts.dest, geo);
+    return {
+      geo,
+      candidateCount: cands.length,
+      spots,
+      planDays: buildPlan(opts, spots),
+      budget: budgetSplit(opts.budget, opts.people, opts.days),
+      links: {
+        rakuten: Links.rakuten(opts.dest),
+        jalan: Links.jalan(opts.dest),
+        transit: opts.from ? Links.transit(opts.from, opts.dest) : null
+      }
+    };
+  }
+
+  return { geocode, fetchCandidates, fetchDetails, filterAndScore, buildPlan, budgetSplit, generatePlan, Links };
+})();
+/*__TRAVEL_LOGIC_END__*/
+</script>
+
+<script>
+"use strict";
+/* ---------- 画面側：入力→生成→表示 ---------- */
+function esc(s){
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+function yen(n){ return "¥" + Number(n).toLocaleString("ja-JP"); }
+function setStatus(msg, isError){
+  var el = $("status");
+  el.textContent = msg || "";
+  el.className = isError ? "error" : "";
+}
+function rowHtml(row){
+  var h = '<div class="row"><div class="time">' + esc(row.time) + '</div><div class="body">';
+  if (row.type === "spot"){
+    var s = row.spot;
+    h += '<div class="ttl">' + esc(s.title) + '<span class="badge ok">Wikipediaで確認済み</span></div>';
+    if (s.extract) h += '<div class="desc">' + esc(s.extract.slice(0, 140)) + (s.extract.length > 140 ? "…" : "") + '</div>';
+    h += '<div class="desc">';
+    if (s.distKm != null) h += "中心から約 " + s.distKm + " km ／ ";
+    h += '<a class="ext" href="' + esc(s.wikiUrl) + '" target="_blank" rel="noopener">出典：Wikipedia「' + esc(s.title) + '」</a></div>';
+    h += "</div>";
+    if (s.thumb) h += '<img class="thumb" src="' + esc(s.thumb) + '" alt="" loading="lazy">';
+    h += "</div>";
+    return h;
+  }
+  h += '<div class="ttl">' + esc(row.title || "") + (row.type === "meal" || row.type === "stay" ? '<span class="badge warn">未確認の提案</span>' : "") + "</div>";
+  if (row.note) h += '<div class="desc">' + esc(row.note) + "</div>";
+  var links = row.links || (row.link ? [row.link] : []);
+  if (links.length){
+    h += '<div class="links">';
+    links.forEach(function(l){
+      h += '<a class="' + esc(l.cls || "") + '" href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + "</a>";
+    });
+    h += "</div>";
+  }
+  h += "</div></div>";
+  return h;
+}
+function renderPlan(opts, result){
+  var area = $("planArea");
+  var nights = opts.days - 1;
+  var tripLabel = opts.days === 1 ? "日帰り" : nights + "泊" + opts.days + "日";
+  var h = "";
+  h += '<section class="card"><h2>' + esc(opts.from ? opts.from + " → " : "") + esc(opts.dest) + " のプラン（" + tripLabel + "・" + opts.people + "名）</h2>";
+  if (opts.dateStr) h += '<p class="note">出発日：' + esc(opts.dateStr) + "（予約リンク先で日付を指定してください）</p>";
+  h += '<p class="note">確認できたスポット：' + result.spots.length + "件（候補 " + result.candidateCount + "件から、実在確認と観光向き判定を通ったものだけを掲載）";
+  if (result.geo) h += "<br>中心座標の出典：" + esc(result.geo.source);
+  h += "</p>";
+  if (result.budget){
+    var b = result.budget;
+    h += '<table class="budget-table">';
+    if (b.nights > 0) h += "<tr><td>宿泊費の目安（1人1泊）</td><td>" + yen(b.hotelPerNightPerPerson) + "</td></tr>";
+    h += "<tr><td>交通費の目安（1人・往復）</td><td>" + yen(b.transportPerPerson) + "</td></tr>";
+    h += "<tr><td>食事・観光の目安（1人1日）</td><td>" + yen(b.foodSightPerDayPerPerson) + "</td></tr>";
+    h += "</table>";
+    h += '<p class="note">予算 ' + yen(b.total) + "（" + b.people + "名合計）を割り振った概算です。実際の料金はリンク先でご確認ください。</p>";
+  }
+  h += '<div class="links"><a class="rakuten" href="' + esc(result.links.rakuten) + '" target="_blank" rel="noopener">楽天トラベルで ' + esc(opts.dest) + ' の宿を探す</a>';
+  h += '<a class="jalan" href="' + esc(result.links.jalan) + '" target="_blank" rel="noopener">じゃらんで ' + esc(opts.dest) + ' の宿を探す</a>';
+  if (result.links.transit) h += '<a href="' + esc(result.links.transit) + '" target="_blank" rel="noopener">Yahoo!路線情報（往路）</a>';
+  h += "</div></section>";
+  result.planDays.forEach(function(d){
+    h += '<section class="day-card"><h3>' + d.day + "日目</h3>";
+    d.rows.forEach(function(r){ h += rowHtml(r); });
+    h += "</section>";
+  });
+  if (!result.spots.length){
+    h += '<section class="card"><p>確認できるスポットが見つかりませんでした。行き先の表記を変える（例：市名・観光地名にする）と見つかることがあります。</p></section>';
+  }
+  area.innerHTML = h;
+}
+function collectOpts(){
+  var prefs = Array.prototype.map.call(document.querySelectorAll(".pref:checked"), function(el){ return el.value; });
+  var budget = parseInt($("budgetInput").value, 10);
+  return {
+    from: $("fromPlace").value.trim(),
+    dest: $("destPlace").value.trim(),
+    days: parseInt($("daysSel").value, 10),
+    people: parseInt($("peopleSel").value, 10),
+    budget: isFinite(budget) && budget > 0 ? budget : 0,
+    dateStr: $("dateInput").value || "",
+    prefs: prefs
+  };
+}
+function onGenerate(){
+  var opts = collectOpts();
+  if (!opts.dest){ setStatus("行き先を入力してください。", true); return; }
+  var btn = $("genBtn");
+  btn.disabled = true;
+  setStatus("スポットを Wikipedia で確認しながらプランを作っています…（10〜20秒ほど）");
+  $("planArea").innerHTML = "";
+  TravelLogic.generatePlan(opts).then(function(result){
+    renderPlan(opts, result);
+    setStatus("プランができました。スポットはすべて Wikipedia で実在確認済みのものです。");
+    btn.disabled = false;
+    if (result.spots.length){
+      var planKey = [opts.from, opts.dest, opts.days, opts.people].join("|").toLowerCase();
+      tryAwardPlanPoint(planKey);
+    }
+  }).catch(function(e){
+    setStatus("プランを作れませんでした（" + (e && e.message ? e.message : "通信エラー") + "）。少し待ってからもう一度お試しください。", true);
+    btn.disabled = false;
+  });
+}
+$("genBtn").addEventListener("click", onGenerate);
+initAuth();
+</script>
+</body>
+</html>
